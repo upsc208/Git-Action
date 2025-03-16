@@ -20,14 +20,21 @@ jobs:
 
       - name: Build Docker image
         run: |
-          eval $(minikube docker-env)
           docker build -t my-nginx-app .
+          minikube image load my-nginx-app  # Minikube에 직접 이미지 로드
 
       - name: Deploy to Minikube
         run: |
-          kubectl delete deployment nginx-test || true
+          kubectl delete deployment nginx-test --ignore-not-found=true
           kubectl create deployment nginx-test --image=my-nginx-app
           kubectl expose deployment nginx-test --type=NodePort --port=80
 
-      - name: Get Minikube Service URL
-        run: minikube service nginx-test --url
+      - name: Wait for deployment to be ready
+        run: |
+          kubectl rollout status deployment/nginx-test
+
+      - name: Forward port for local access
+        run: |
+          nohup kubectl port-forward service/nginx-test 8080:80 &
+          sleep 5
+          echo "Service accessible at http://127.0.0.1:8080"
