@@ -45,3 +45,8 @@ jobs:
           nohup kubectl port-forward service/nginx-test 8080:80 &
           sleep 5
           echo "Service accessible at http://127.0.0.1:8080"
+
+      - name: Debug Secrets
+        run: |
+          echo "DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}"
+
