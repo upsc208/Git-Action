@@ -25,26 +25,25 @@ jobs:
 
       - name: Build and push Docker image
         run: |
-          # Base64 디코딩한 값을 변수로 저장
+          
           DOCKER_USER=$(cat username.txt)
           DOCKER_PASS=$(cat password.txt)
 
-          # Docker 빌드
           docker build -t $DOCKER_USER/my-nginx-app:latest .
 
-          # Docker Hub 로그인 (보안 방식 적용)
+          
           echo "$DOCKER_PASS" | docker login -u $DOCKER_USER --password-stdin
           
-          # 빌드된 이미지 푸시
+          
           docker push $DOCKER_USER/my-nginx-app:latest
 
       - name: Deploy to Minikube
         run: |
-          # Deployment 존재 여부 확인 후 생성
+          
           kubectl get deployment nginx-test || kubectl create deployment nginx-test --image=$DOCKER_USER/my-nginx-app:latest
           
-          # Deployment 업데이트
+          
           kubectl set image deployment/nginx-test nginx=$DOCKER_USER/my-nginx-app:latest
           
-          # 즉시 롤아웃 상태 확인
+          
           kubectl rollout status deployment/nginx-test --timeout=120s || kubectl get pods -o wide
