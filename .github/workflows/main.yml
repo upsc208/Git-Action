@@ -18,17 +18,21 @@ jobs:
         with:
           driver: docker
 
-      # Actions 예시 (빌드 & 푸시)
       - name: Build and push Docker image
         run: |
-          docker build -t <dockerhub-username>/my-nginx-app:latest .
+          # Docker 빌드
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/my-nginx-app:latest .
+          # Docker Hub 로그인 (Secrets에서 유저명, 패스워드 참조)
           docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_PASSWORD }}
-          docker push <dockerhub-username>/my-nginx-app:latest
+          # 빌드된 이미지 푸시
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/my-nginx-app:latest
+
       - name: Deploy to Minikube
         run: |
-          kubectl set image deployment/nginx-test nginx=<dockerhub-username>/my-nginx-app:latest
+          # kubectl set image로 기존 Deployment 이미지 업데이트
+          kubectl set image deployment/nginx-test nginx=${{ secrets.DOCKERHUB_USERNAME }}/my-nginx-app:latest
+          # 즉시 롤아웃 상황 표시
           kubectl rollout status deployment/nginx-test
-      
 
       - name: Wait for deployment to be ready
         run: |
