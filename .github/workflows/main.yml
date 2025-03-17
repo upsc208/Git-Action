@@ -18,32 +18,32 @@ jobs:
         with:
           driver: docker
 
-      - name: Decode Secrets
-        run: |
-          echo "${{ secrets.USERNAME_SECRET }}" | base64 --decode > username.txt
-          echo "${{ secrets.PASSWORD_SECRET }}" | base64 --decode > password.txt
-
       - name: Build and push Docker image
         run: |
+          # Docker 빌드
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/my-nginx-app:latest .
           
-          DOCKER_USER=$(cat username.txt)
-          DOCKER_PASS=$(cat password.txt)
-
-          docker build -t $DOCKER_USER/my-nginx-app:latest .
-
+          # Docker Hub 로그인 (보안 방식 적용)
+          echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
           
-          echo "$DOCKER_PASS" | docker login -u $DOCKER_USER --password-stdin
-          
-          
-          docker push $DOCKER_USER/my-nginx-app:latest
+          # 빌드된 이미지 푸시
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/my-nginx-app:latest
 
       - name: Deploy to Minikube
         run: |
+          # Deployment 존재 여부 확인 후 생성 (컨테이너 이름 명시적으로 설정)
+          kubectl get deployment nginx-test || kubectl create deployment nginx-test --image=${{ secrets.DOCKERHUB_USERNAME }}/my-nginx-app:latest --dry-run=client -o yaml | kubectl apply -f -
           
-          kubectl get deployment nginx-test || kubectl create deployment nginx-test --image=$DOCKER_USER/my-nginx-app:latest
+          # 올바른 컨테이너 이름을 지정하여 이미지 업데이트
+          kubectl set image deployment/nginx-test nginx-test=${{ secrets.DOCKERHUB_USERNAME }}/my-nginx-app:latest
           
-          
-          kubectl set image deployment/nginx-test nginx=$DOCKER_USER/my-nginx-app:latest
-          
-          
+          # 즉시 롤아웃 상태 확인
           kubectl rollout status deployment/nginx-test --timeout=120s || kubectl get pods -o wide
+
+      - name: Expose Service
+        run: |
+          # 서비스가 없으면 생성
+          kubectl get service nginx-test || kubectl expose deployment nginx-test --type=NodePort --port=80
+          
+          # 현재 서비스 URL 확인
+          minikube service nginx-test --url
