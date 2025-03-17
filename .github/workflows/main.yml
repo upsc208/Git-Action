@@ -43,10 +43,10 @@ jobs:
         run: |
           # Deployment 존재 여부 확인 후 생성
           kubectl get deployment nginx-test || kubectl create deployment nginx-test --image=$DOCKER_USER/my-nginx-app:latest --dry-run=client -o yaml | kubectl apply -f -
-          
-          # Deployment 업데이트 (컨테이너 이름도 지정)
-          kubectl set image deployment/nginx-test nginx-test=$DOCKER_USER/my-nginx-app:latest
-          
+
+          # Deployment 업데이트 (컨테이너 이름은 nginx)
+          kubectl set image deployment/nginx-test nginx=$DOCKER_USER/my-nginx-app:latest
+
           # 즉시 롤아웃 상태 확인
           kubectl rollout status deployment/nginx-test --timeout=120s || kubectl get pods -o wide
 
