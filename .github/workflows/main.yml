@@ -27,24 +27,43 @@ jobs:
 
       - name: Build and push Docker image
         run: |
-          # DOCKER_USER 변수 확인
           echo "DOCKER_USER: $DOCKER_USER"
 
           # Docker 빌드 (태그를 DOCKER_USER로 지정)
           docker build -t $DOCKER_USER/my-nginx-app:latest .
-          
+
           # Docker Hub 로그인
           echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-          
+
           # 빌드된 이미지 푸시
           docker push "$DOCKER_USER/my-nginx-app:latest"
 
       - name: Deploy to Minikube
         run: |
-          # Deployment 존재 여부 확인 후 생성
-          kubectl get deployment nginx-test || kubectl create deployment nginx-test --image=$DOCKER_USER/my-nginx-app:latest --dry-run=client -o yaml | kubectl apply -f -
+          # Deployment 존재 여부 확인 후 생성 (컨테이너 이름 명시)
+          kubectl get deployment nginx-test || kubectl apply -f - <<EOF
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: nginx-test
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: nginx-test
+            template:
+              metadata:
+                labels:
+                  app: nginx-test
+              spec:
+                containers:
+                  - name: nginx  # 컨테이너 이름 명시
+                    image: $DOCKER_USER/my-nginx-app:latest
+                    ports:
+                      - containerPort: 80
+          EOF
 
-          # Deployment 업데이트 (컨테이너 이름은 nginx)
+          # Deployment 업데이트 (컨테이너 이름이 'nginx'이므로 설정 가능)
           kubectl set image deployment/nginx-test nginx=$DOCKER_USER/my-nginx-app:latest
 
           # 즉시 롤아웃 상태 확인
@@ -54,6 +73,6 @@ jobs:
         run: |
           # 서비스가 없으면 생성
           kubectl get service nginx-test || kubectl expose deployment nginx-test --type=NodePort --port=80
-          
+
           # 현재 서비스 URL 확인
           minikube service nginx-test --url
