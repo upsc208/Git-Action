@@ -22,31 +22,30 @@ jobs:
         run: |
           # Docker 빌드
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/my-nginx-app:latest .
-          # Docker Hub 로그인 (Secrets에서 유저명, 패스워드 참조)
-          docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_PASSWORD }}
+          
+          # Docker Hub 로그인 (보안 방식 적용)
+          echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+          
           # 빌드된 이미지 푸시
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/my-nginx-app:latest
 
       - name: Deploy to Minikube
         run: |
-          # kubectl set image로 기존 Deployment 이미지 업데이트
+          # Deployment 존재 여부 확인 후 생성
+          kubectl get deployment nginx-test || kubectl create deployment nginx-test --image=${{ secrets.DOCKERHUB_USERNAME }}/my-nginx-app:latest
+          
+          # Deployment 업데이트
           kubectl set image deployment/nginx-test nginx=${{ secrets.DOCKERHUB_USERNAME }}/my-nginx-app:latest
-          # 즉시 롤아웃 상황 표시
-          kubectl rollout status deployment/nginx-test
+          
+          # 즉시 롤아웃 상태 확인
+          kubectl rollout status deployment/nginx-test --timeout=120s || kubectl get pods -o wide
 
       - name: Wait for deployment to be ready
         run: |
           # 2분 내로 롤아웃 완료되지 않으면 에러 처리
-          kubectl rollout status deployment/nginx-test --timeout=120s || kubectl get pods -o wide
+          kubectl rollout status deployment/nginx-test --timeout=120s || (echo "Deployment failed!" && exit 1)
 
-      - name: Forward port for local access
+      - name: Get Minikube Service URL
         run: |
-          # 백그라운드에서 포트포워딩 수행 후 5초 대기
-          nohup kubectl port-forward service/nginx-test 8080:80 &
-          sleep 5
-          echo "Service accessible at http://127.0.0.1:8080"
-
-      - name: Debug Secrets
-        run: |
-          echo "DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}"
-
+          # Minikube에서 서비스 URL 확인
+          minikube service nginx-test --url
